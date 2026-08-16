@@ -357,3 +357,156 @@ docker exec -it kafka-5-1 \
   --formatter-property print.key=true \
   --formatter-property print.value=true
 ```
+
+## Exercise 6.1. At-least-once
+1. Create a topic. This time, only one partition is created. 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-topics.sh \
+  --create \
+  --topic atleast-once-lab \
+  --partitions 1 \
+  --replication-factor 3 \
+  --bootstrap-server kafka-1:29092
+```
+2. Create producer 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-console-producer.sh \
+  --topic atleast-once-lab \
+  --bootstrap-server kafka-1:29092
+```
+Then send messages:
+    payment-001
+    payment-002
+    payment-003
+Then control + C
+3. Create consumer with auto commit, but the commit will occur only 60 seconds.
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --topic atleast-once-lab \
+  --group atleast-workers \
+  --from-beginning \
+  --bootstrap-server kafka-1:29092 \
+  --command-property enable.auto.commit=false \
+  --formatter-property print.offset=true \
+  --formatter-property print.value=true
+```
+After 3 messages are shown, kill that consumer. So nothing is yet committed. 
+![alt text](docs/images/exercise-6/6.1/first.png)
+4. Look at commited offset. 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka-1:29092 \
+  --describe \
+  --group atleast-workers
+```
+![alt text](docs/images/exercise-6/6.1/second.png)
+5. Then kill the consumer and create new one 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --topic atleast-once-lab \
+  --group atleast-workers \
+  --from-beginning \
+  --bootstrap-server kafka-1:29092 \
+  --command-property enable.auto.commit=false \
+  --formatter-property print.offset=true \
+  --formatter-property print.value=true
+```
+![alt text](docs/images/exercise-6/6.1/third.png)
+
+## Exercise 6.2. At-most-once 
+1. Create new topic 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-topics.sh \
+  --create \
+  --topic atmost-once-lab \
+  --partitions 1 \
+  --replication-factor 3 \
+  --bootstrap-server kafka-1:29092
+```
+2. Create Producer
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-console-producer.sh \
+  --topic atmost-once-lab \
+  --bootstrap-server kafka-1:29092
+```
+Then send 3 messages. 
+3. Simulate with this script
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --topic atmost-once-lab \
+  --group atmost-workers \
+  --from-beginning \
+  --bootstrap-server kafka-1:29092 \
+  --max-messages 1
+```
+This will let consumer read 1 message, then exit. So 2 messages are not read yet.
+4. Then Check with this script 
+```bash
+docker exec -it kafka-5-1 \
+  /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka-1:29092 \
+  --describe \
+  --group atmost-workers
+```
+![alt text](docs/images/exercise-6/6.2/first.png)
+5. Kill that consumer. 
+6. Create consumer that will shift offset by one. 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka-1:29092 \
+  --group atmost-workers \
+  --topic atmost-once-lab \
+  --reset-offsets \
+  --shift-by 1 \
+  --execute
+```
+So this would mean that message 2 is now commited, but hasn't yet process. 
+7. Describe that consumer 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka-1:29092 \
+  --describe \
+  --group atmost-workers
+```
+
+## Exercise 6.3. Idempotent Consumer
+1. Create topic 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-topics.sh \
+  --create \
+  --topic idempotent-lab \
+  --partitions 1 \
+  --replication-factor 3 \
+  --bootstrap-server kafka-1:29092
+```
+2. Create Producer. 
+```bash
+docker exec -it kafka-6-1 \
+  /opt/kafka/bin/kafka-console-producer.sh \
+  --topic idempotent-lab \
+  --bootstrap-server kafka-1:29092
+```
+3. Install confluent_kafka
+```bash
+pip install confluent-kafka
+```
+4. Run consumer.py
+```bash
+python consumer.py
+```
+** Make sure you're at exercise-6. 
+![alt text](docs/images/exercise-6/6.3/first.png)
+
+5. Note
+This is just a simulating of idempotent consumer concept. Data is store in RAM, so it'll be deleted later after the process restarts. 
