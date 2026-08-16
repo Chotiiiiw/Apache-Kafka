@@ -265,11 +265,11 @@ docker exec -it kafka-4-1 \
 ```
 ![alt text](docs/images/exercise-4/fifth.png)
 There are lags in patition-3 and partition-4.
-## Exercise 5, Delivery Semantics / Offset Commit
+## Exercise 5. Delivery Semantics / Offset Commit
 
 1. Create a topic called delivery-lab 
 ```bash
-docker exec -it kafka-4-1 \
+docker exec -it kafka-5-1 \
   /opt/kafka/bin/kafka-topics.sh \
   --create \
   --topic delivery-lab \
@@ -279,24 +279,26 @@ docker exec -it kafka-4-1 \
 ```
 2. You may check 
 ```bash
-docker exec -it kafka-4-1 \
+docker exec -it kafka-5-1 \
   /opt/kafka/bin/kafka-topics.sh \
   --describe \
   --topic delivery-lab \
   --bootstrap-server kafka-1:29092
 ```
+![alt text](/docs/images/exercise-5/zero.png)
 3. Create Producer with key
 ```bash
-docker exec -it kafka-4-1 \
+docker exec -it kafka-5-1 \
   /opt/kafka/bin/kafka-console-producer.sh \
   --topic delivery-lab \
   --bootstrap-server kafka-1:29092 \
   --reader-property parse.key=true \
   --reader-property key.separator=:
 ```
+
 4. Create new consumer group called "delivery-workers"
 ```bash 
-docker exec -it kafka-4-1 \
+docker exec -it kafka-5-1 \
   /opt/kafka/bin/kafka-console-consumer.sh \
   --topic delivery-lab \
   --group delivery-workers \
@@ -307,11 +309,51 @@ docker exec -it kafka-4-1 \
   --formatter-property print.key=true \
   --formatter-property print.value=true
 ```
+![alt text](/docs/images/exercise-5/third.png)
 5. Check commited status 
 ```bash
-docker exec -it kafka-4-1 \
+docker exec -it kafka-5-1 \
   /opt/kafka/bin/kafka-consumer-groups.sh \
   --bootstrap-server kafka-1:29092 \
   --describe \
   --group delivery-workers
+```
+![alt text](docs/images/exercise-5/first.png)
+6. Stop consumer group with "control + C"
+7. Offset reset (Preview)
+```bash
+docker exec -it kafka-5-1 \
+  /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka-1:29092 \
+  --group delivery-workers \
+  --topic delivery-lab \
+  --reset-offsets \
+  --shift-by -1 \
+  --dry-run
+```
+![alt text](docs/images/exercise-5/second.png)
+ 
+8. Offset reset (Execute)
+```bash
+docker exec -it kafka-5-1 \
+  /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server kafka-1:29092 \
+  --group delivery-workers-v2 \
+  --topic delivery-lab \
+  --reset-offsets \
+  --shift-by -1 \
+  --execute
+```
+
+9. Check
+```bash
+docker exec -it kafka-5-1 \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --topic delivery-lab \
+  --group delivery-workers \
+  --bootstrap-server kafka-1:29092 \
+  --formatter-property print.partition=true \
+  --formatter-property print.offset=true \
+  --formatter-property print.key=true \
+  --formatter-property print.value=true
 ```
