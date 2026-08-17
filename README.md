@@ -614,3 +614,4 @@ docker exec -it kafka-7-1 \
   --bootstrap-server kafka-1:29092 \
   --producer-property acks=1
 ```
+
