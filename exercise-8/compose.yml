@@ -1,0 +1,94 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    ports:
+      - "5432:5432"
+
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shop
+
+    # Debezium requires PostgreSQL logical decoding.
+    # wal_level=logical makes PostgreSQL write enough information
+    # into the WAL for CDC / logical replication.
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=10
+      - -c
+      - max_wal_senders=10
+
+  kafka:
+    image: apache/kafka:4.3.1
+    container_name: kafka
+    ports:
+      - "9092:9092"
+
+    environment:
+      # Run Kafka in KRaft mode with a single node acting as both broker and controller
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+
+      # Internal Docker listener and host listener
+      KAFKA_LISTENERS: >
+        PLAINTEXT://:29092,
+        CONTROLLER://:29093,
+        PLAINTEXT_HOST://:9092
+
+      # Addresses advertised to Docker containers and the host machine
+      KAFKA_ADVERTISED_LISTENERS: >
+        PLAINTEXT://kafka:29092,
+        PLAINTEXT_HOST://localhost:9092
+
+      # Map listener names to security protocols
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: >
+        CONTROLLER:PLAINTEXT,
+        PLAINTEXT:PLAINTEXT,
+        PLAINTEXT_HOST:PLAINTEXT
+
+      # Listener used by the KRaft controller
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+
+      # Listener used for broker-to-broker communication
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      # Single-node controller quorum
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+
+      # Replication settings for a single-broker local environment
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+
+  connect:
+    image: quay.io/debezium/connect:3.6
+    container_name: connect
+
+    depends_on:
+      - kafka
+      - postgres
+
+    ports:
+      # Kafka Connect REST API
+      - "8083:8083"
+
+    environment:
+      # Kafka broker address used by Kafka Connect inside the Docker network
+      BOOTSTRAP_SERVERS: kafka:29092
+
+      # Consumer group ID used by the Kafka Connect cluster
+      GROUP_ID: debezium-connect-cluster
+
+      # Internal Kafka topics used by Kafka Connect
+      CONFIG_STORAGE_TOPIC: debezium_connect_configs
+      OFFSET_STORAGE_TOPIC: debezium_connect_offsets
+      STATUS_STORAGE_TOPIC: debezium_connect_statuses
+
+      # Replication settings for a single-broker local environment
+      CONFIG_STORAGE_REPLICATION_FACTOR: 1
+      OFFSET_STORAGE_REPLICATION_FACTOR: 1
+      STATUS_STORAGE_REPLICATION_FACTOR: 1
