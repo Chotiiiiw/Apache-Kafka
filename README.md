@@ -615,3 +615,96 @@ docker exec -it kafka-7-1 \
   --producer-property acks=1
 ```
 
+# Big Lab
+## Exercise 8. Connect kafka to sources.
+
+1. Start docker. 
+```bash
+docker compose up
+```
+Check 
+```bash
+docker compose ps
+```
+2. Create table in PostgreSQL 
+- Get into postgres
+```bash
+docker exec -it postgres psql -U postgres -d shop
+```
+- Create table 
+```bash
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  email VARCHAR(255) NOT NULL
+);
+```
+- Insert Value 
+```bash
+INSERT INTO users (name, email)
+VALUES ('Alice', 'alice@gmail.com');
+```
+- Check 
+```bash
+SELECT * FROM users;
+```
+Then stop it by pressing "control + C"
+4. Check the connector 
+```bash
+curl localhost:8083/connectors
+```
+"[]" should be given because there is no connector yet.
+
+- Connect to connector
+```bash
+curl -i \
+  -X POST \
+  -H "Content-Type: application/json" \
+  --data @postgres-connector.json \
+  http://localhost:8083/connectors
+```
+- Check 
+```bash
+curl localhost:8083/connectors
+```
+"["shop-postgres-connector"]" should be shown. 
+5. List all of the topics 
+```bash
+docker exec -it kafka \
+  /opt/kafka/bin/kafka-topics.sh \
+  --bootstrap-server localhost:9092 \
+  --list
+```
+![alt text](docs/images/exercise-8/first.png)
+6. Create consumer that read from shop.public.user topic 
+```bash
+docker exec -it kafka \
+  /opt/kafka/bin/kafka-console-consumer.sh \
+  --bootstrap-server localhost:9092 \
+  --topic shop.public.users \
+  --from-beginning
+```
+7. Let's try cdc. 
+- Open new terminal then insert new data 
+```bash 
+docker exec -it postgres psql -U postgres -d shop
+```
+```bash
+INSERT INTO users (name, email)
+VALUES ('Bob', 'bob@yahoo.com');
+```
+Then you can see on consumer terminal that Bob's row appears.
+Next, try to update Bob's email to gmail instead of yahoo. 
+```bash
+UPDATE users
+SET email = 'bob@gmail.com'
+WHERE id = 2;
+```
+Then you can see on consumer terminal that Bob's email is now bob@gmail.com.
+
+Finally, delete Bob's information from our table. 
+```bash
+DELETE FROM users
+WHERE id = 2;
+```
+Bob's data is now deleted. 
